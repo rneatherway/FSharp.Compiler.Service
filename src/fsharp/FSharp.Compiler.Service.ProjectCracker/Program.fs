@@ -7,15 +7,15 @@ open System.IO
 open System
 open System.Reflection
 open System.Runtime.Serialization.Formatters.Binary
+open Microsoft.FSharp.Compiler.SourceCodeServices
 
-
-type ProjectOptions =
-  {
-    ProjectFile: string
-    Options: string[]
-    ReferencedProjectOptions: (string * ProjectOptions)[]
-    LogOutput: string
-  }
+// type ProjectOptions =
+//   {
+//     ProjectFile: string
+//     Options: string[]
+//     ReferencedProjectOptions: (string * ProjectOptions)[]
+//     LogOutput: string
+//   }
 
 module Program =
   let runningOnMono = 
@@ -366,7 +366,8 @@ module Program =
 
 
   let getOptions file enableLogging properties =
-    let rec getOptions file : Option<string> * ProjectOptions =
+    let log = new StringBuilder()
+    let rec getOptions file : Option<string> * FSharpProjectOptions =
       let parsedProject = FSharpProjectFileInfo.Parse(file, properties=properties, enableLogging=enableLogging)
       let referencedProjectOptions =
         [| for file in parsedProject.ProjectReferences do
@@ -375,13 +376,17 @@ module Program =
                 | Some outFile, opts -> yield outFile, opts
                 | None, _ -> () |]
 
-      let options = { ProjectFile = file
-                      Options = Array.ofList parsedProject.Options
-                      ReferencedProjectOptions = referencedProjectOptions
-                      LogOutput = parsedProject.LogOutput }
+      let options = { ProjectFilename = file
+                      ProjectFileNames = [||]
+                      OtherOptions = Array.ofList parsedProject.Options
+                      IsIncompleteTypeCheckEnvironment = false
+                      UseScriptResolutionRules = false
+                      LoadTime = loadedTimeStamp
+                      UnresolvedReferences = None }
+      log.Append(parsedProject.LogOutput)
       parsedProject.OutputFile, options
 
-    snd (getOptions file)
+    snd (getOptions file), log.ToString()
 
   let addMSBuildv14BackupResolution () =
     let onResolveEvent = new ResolveEventHandler(fun sender evArgs ->
@@ -409,6 +414,16 @@ module Program =
               Assembly.Load (requestedAssembly))
       AppDomain.CurrentDomain.add_AssemblyResolve(onResolveEvent)
 
+  let emptyOptions =
+      { ProjectFileName = ""
+        ProjectFileNames = [||]
+        OtherOptions = [||]
+        ReferencedProjects = [||]
+        IsIncompleteTypeCheckEnvironment = false
+        UseScriptResolutionRules = false
+        LoadTime = System.DateTime.Now
+        UnresolvedReferences = None}
+
   let rec pairs l =
     match l with
     | [] | [_] -> []
@@ -419,28 +434,26 @@ module Program =
       let binary = Array.exists (fun (s: string) -> s = "--binary") argv
       let argv = Array.filter (fun (s: string) -> s <> "--binary") argv
 
-      let ret, opts =
+      let ret, opts, log =
           try
               addMSBuildv14BackupResolution ()
-              //redirectAssembly "FSharp.Core" (Version("4.3.1.0")) "b03f5f7f11d50a3a"
-              //redirectAssembly "FSharp.Core" (Version("4.4.0.0")) "b03f5f7f11d50a3a"
               if argv.Length >= 2 then
                 let projectFile = argv.[0]
                 let enableLogging = match Boolean.TryParse(argv.[1]) with
                                     | true, true -> true
                                     | _ -> false
                 let props = pairs (List.ofArray argv.[2..])
-                let opts = getOptions argv.[0] enableLogging props
-                0, opts
+                let opts, log = getOptions argv.[0] enableLogging props
+                0, opts, log
               else
-                1, { ProjectFile = ""; Options = [||]; ReferencedProjectOptions = [||]; LogOutput = "At least two arguments required." }
+                1, emptyOptions, "At least two arguments required."
           with e ->
-                2, { ProjectFile = ""; Options = [||]; ReferencedProjectOptions = [||]; LogOutput = e.ToString() }
+                2, emptyOptions, e.ToString()
 
       if binary then
           let fmt = new BinaryFormatter()
           use out = new StreamWriter(System.Console.OpenStandardOutput())
-          fmt.Serialize(out.BaseStream, opts)
+          fmt.Serialize(out.BaseStream, (opts, log))
       else
           printfn "%A" opts
       ret
