@@ -2662,6 +2662,13 @@ type BackgroundCompiler(projectCacheSize, keepAssemblyContents, keepAllBackgroun
 // FSharpChecker
 //
 
+type private CrackerProjectOptions =
+  {
+    ProjectFile: string
+    Options: string[]
+    ReferencedProjectOptions: (string * CrackerProjectOptions)[]
+    LogOutput: string
+  }
 
 [<Sealed>]
 [<AutoSerializable(false)>]
@@ -2808,7 +2815,7 @@ type FSharpChecker(projectCacheSize, keepAssemblyContents, keepAllBackgroundReso
         let properties = defaultArg properties []
         let enableLogging = defaultArg enableLogging false
 
-        let rec convert (opts: FSharp.Compiler.Service.ProjectCracker.ProjectOptions) : FSharpProjectOptions =
+        let rec convert (opts: (*FSharp.Compiler.Service.ProjectCracker.*)CrackerProjectOptions) : FSharpProjectOptions =
             let referencedProjects = Array.map (fun (a, b) -> a, convert b) opts.ReferencedProjectOptions
             { ProjectFileName = opts.ProjectFile
               ProjectFileNames = [| |]
@@ -2831,11 +2838,14 @@ type FSharpChecker(projectCacheSize, keepAssemblyContents, keepAllBackgroundReso
                                              "FSharp.Compiler.Service.ProjectCracker.exe")
         p.StartInfo.Arguments <- arguments.ToString()
         p.StartInfo.UseShellExecute <- false
+        p.StartInfo.CreateNoWindow <- true
         p.StartInfo.RedirectStandardOutput <- true
         ignore <| p.Start()
     
-        let fmt = new Serialization.Formatters.Binary.BinaryFormatter()
-        let opts = fmt.Deserialize(p.StandardOutput.BaseStream) :?> FSharp.Compiler.Service.ProjectCracker.ProjectOptions
+        //let fmt = new Serialization.Formatters.Binary.BinaryFormatter()
+        let ser = new System.Runtime.Serialization.Json.DataContractJsonSerializer(typeof<CrackerProjectOptions>)
+        let opts = ser.ReadObject(p.StandardOutput.BaseStream) :?> CrackerProjectOptions
+        //let opts = fmt.Deserialize(p.StandardOutput.BaseStream) :?> FSharp.Compiler.Service.ProjectCracker.ProjectOptions
         p.WaitForExit()
         
         convert opts, opts.LogOutput
