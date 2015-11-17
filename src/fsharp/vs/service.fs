@@ -2819,7 +2819,7 @@ type FSharpChecker(projectCacheSize, keepAssemblyContents, keepAllBackgroundReso
               UnresolvedReferences = None }
 
         let arguments = new StringBuilder()
-        arguments.Append(' ').Append(projectFileName) |> ignore
+        arguments.Append(projectFileName) |> ignore
         arguments.Append(' ').Append(enableLogging.ToString()) |> ignore
         for k, v in properties do
             arguments.Append(' ').Append(k).Append(' ').Append(v) |> ignore
@@ -2833,10 +2833,8 @@ type FSharpChecker(projectCacheSize, keepAssemblyContents, keepAllBackgroundReso
         p.StartInfo.RedirectStandardOutput <- true
         ignore <| p.Start()
     
-        //let fmt = new Serialization.Formatters.Binary.BinaryFormatter()
-        let ser = new System.Runtime.Serialization.Json.DataContractJsonSerializer(typeof<CrackerProjectOptions>)
-        let opts = ser.ReadObject(p.StandardOutput.BaseStream) :?> CrackerProjectOptions
-        //let opts = fmt.Deserialize(p.StandardOutput.BaseStream) :?> FSharp.Compiler.Service.ProjectCracker.ProjectOptions
+        let ser = new System.Runtime.Serialization.Json.DataContractJsonSerializer(typeof<FSharp.Compiler.Service.ProjectCracker.ProjectOptions>)
+        let opts = ser.ReadObject(p.StandardOutput.BaseStream) :?> FSharp.Compiler.Service.ProjectCracker.ProjectOptions
         p.WaitForExit()
         
         convert opts, opts.LogOutput
