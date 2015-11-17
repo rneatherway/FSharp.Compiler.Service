@@ -2662,14 +2662,6 @@ type BackgroundCompiler(projectCacheSize, keepAssemblyContents, keepAllBackgroun
 // FSharpChecker
 //
 
-type private CrackerProjectOptions =
-  {
-    ProjectFile: string
-    Options: string[]
-    ReferencedProjectOptions: (string * CrackerProjectOptions)[]
-    LogOutput: string
-  }
-
 [<Sealed>]
 [<AutoSerializable(false)>]
 // There is typically only one instance of this type in a Visual Studio process.
@@ -2815,7 +2807,7 @@ type FSharpChecker(projectCacheSize, keepAssemblyContents, keepAllBackgroundReso
         let properties = defaultArg properties []
         let enableLogging = defaultArg enableLogging false
 
-        let rec convert (opts: (*FSharp.Compiler.Service.ProjectCracker.*)CrackerProjectOptions) : FSharpProjectOptions =
+        let rec convert (opts: FSharp.Compiler.Service.ProjectCracker.ProjectOptions) : FSharpProjectOptions =
             let referencedProjects = Array.map (fun (a, b) -> a, convert b) opts.ReferencedProjectOptions
             { ProjectFileName = opts.ProjectFile
               ProjectFileNames = [| |]
@@ -2827,7 +2819,6 @@ type FSharpChecker(projectCacheSize, keepAssemblyContents, keepAllBackgroundReso
               UnresolvedReferences = None }
 
         let arguments = new StringBuilder()
-        arguments.Append("--binary") |> ignore
         arguments.Append(' ').Append(projectFileName) |> ignore
         arguments.Append(' ').Append(enableLogging.ToString()) |> ignore
         for k, v in properties do

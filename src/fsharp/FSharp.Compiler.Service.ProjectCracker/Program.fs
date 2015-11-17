@@ -9,14 +9,6 @@ open System.Reflection
 open System.Runtime.Serialization.Formatters.Binary
 open System.Runtime.Serialization.Json
 
-type ProjectOptions =
-  {
-    ProjectFile: string
-    Options: string[]
-    ReferencedProjectOptions: (string * ProjectOptions)[]
-    LogOutput: string
-  }
-
 module Program =
   let runningOnMono = 
       try match System.Type.GetType("Mono.Runtime") with null -> false | _ -> true
@@ -401,9 +393,6 @@ module Program =
 
   [<EntryPoint>]
   let main argv =
-      let binary = Array.exists (fun (s: string) -> s = "--binary") argv
-      let argv = Array.filter (fun (s: string) -> s <> "--binary") argv
-
       let ret, opts =
           try
               addMSBuildv14BackupResolution ()
@@ -420,20 +409,6 @@ module Program =
           with e ->
                 2, { ProjectFile = ""; Options = [||]; ReferencedProjectOptions = [||]; LogOutput = e.ToString() }
 
-      if binary then
-          let fmt = new BinaryFormatter()
-          use out = new StreamWriter(System.Console.OpenStandardOutput())
-          fmt.Serialize(out.BaseStream, opts)
-      else
-            let ser = new DataContractJsonSerializer(typeof<ProjectOptions>)
-            ser.WriteObject(Console.OpenStandardOutput(), opts)
-
-//          let out = System.IO.File.CreateText("data.json")
-//          ser.WriteObject(out.BaseStream, opts)
-//          out.Close()
-//
-//          let infile = System.IO.File.OpenText("data.json")
-//          let o = ser.ReadObject(infile.BaseStream) :?> ProjectOptions
-//          infile.Close()
-//          printfn "%A" o
+      let ser = new DataContractJsonSerializer(typeof<ProjectOptions>)
+      ser.WriteObject(Console.OpenStandardOutput(), opts)
       ret
