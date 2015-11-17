@@ -2808,16 +2808,16 @@ type FSharpChecker(projectCacheSize, keepAssemblyContents, keepAllBackgroundReso
         let properties = defaultArg properties []
         let enableLogging = defaultArg enableLogging false
 
-        let rec convert (opts: FSharp.Compiler.Service.ProjectCracker.ProjectOptions) : FSharpProjectOptions =
-            let referencedProjects = Array.map (fun (a, b) -> a, convert b) opts.ReferencedProjectOptions
-            { ProjectFileName = opts.ProjectFile
-              ProjectFileNames = [| |]
-              OtherOptions = opts.Options
-              ReferencedProjects = referencedProjects
-              IsIncompleteTypeCheckEnvironment = false
-              UseScriptResolutionRules = false
-              LoadTime = loadedTimeStamp
-              UnresolvedReferences = None }
+//        let rec convert (opts: FSharp.Compiler.Service.ProjectCracker.ProjectOptions) : FSharpProjectOptions =
+//            let referencedProjects = Array.map (fun (a, b) -> a, convert b) opts.ReferencedProjectOptions
+//            { ProjectFileName = opts.ProjectFile
+//              ProjectFileNames = [| |]
+//              OtherOptions = opts.Options
+//              ReferencedProjects = referencedProjects
+//              IsIncompleteTypeCheckEnvironment = false
+//              UseScriptResolutionRules = false
+//              LoadTime = loadedTimeStamp
+//              UnresolvedReferences = None }
 
         let arguments = new StringBuilder()
         arguments.Append("--binary") |> ignore
@@ -2835,10 +2835,11 @@ type FSharpChecker(projectCacheSize, keepAssemblyContents, keepAllBackgroundReso
         ignore <| p.Start()
     
         let fmt = new Serialization.Formatters.Binary.BinaryFormatter()
-        let opts = fmt.Deserialize(p.StandardOutput.BaseStream) :?> FSharp.Compiler.Service.ProjectCracker.ProjectOptions
+        let opts = fmt.Deserialize(p.StandardOutput.BaseStream) :?> FSharpProjectOptions * string
         p.WaitForExit()
+        //p.ExitCode
         
-        convert opts, opts.LogOutput
+        opts
 
     member ic.GetProjectOptionsFromProjectFile(projectFileName : string, ?properties : (string * string) list, ?loadedTimeStamp) =
         fst (ic.GetProjectOptionsFromProjectFileLogged(projectFileName, ?properties=properties, ?loadedTimeStamp=loadedTimeStamp))

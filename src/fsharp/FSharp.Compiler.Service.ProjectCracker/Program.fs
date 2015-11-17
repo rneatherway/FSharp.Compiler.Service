@@ -365,7 +365,7 @@ module Program =
       static member Parse(fsprojFileName:string, ?properties, ?enableLogging) = new FSharpProjectFileInfo(fsprojFileName, ?properties=properties, ?enableLogging=enableLogging)
 
 
-  let getOptions file enableLogging properties =
+  let getOptions file enableLogging properties : FSharpProjectOptions * string =
     let log = new StringBuilder()
     let rec getOptions file : Option<string> * FSharpProjectOptions =
       let parsedProject = FSharpProjectFileInfo.Parse(file, properties=properties, enableLogging=enableLogging)
@@ -376,14 +376,15 @@ module Program =
                 | Some outFile, opts -> yield outFile, opts
                 | None, _ -> () |]
 
-      let options = { ProjectFilename = file
+      let options = { ProjectFileName = file
                       ProjectFileNames = [||]
                       OtherOptions = Array.ofList parsedProject.Options
+                      ReferencedProjects = referencedProjectOptions
                       IsIncompleteTypeCheckEnvironment = false
                       UseScriptResolutionRules = false
-                      LoadTime = loadedTimeStamp
+                      LoadTime = System.DateTime.Now
                       UnresolvedReferences = None }
-      log.Append(parsedProject.LogOutput)
+      log.Append(parsedProject.LogOutput) |> ignore
       parsedProject.OutputFile, options
 
     snd (getOptions file), log.ToString()
