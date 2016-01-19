@@ -50,6 +50,7 @@ module internal Program =
           | None -> None
           | Some level ->
               let log = new BasicStringLogger()
+              printfn "Setting verbosity to %A" level
               do log.Verbosity <- level
               Some log
 
@@ -434,6 +435,8 @@ module internal Program =
       | false, _ -> None
       | true, v -> Some v
 
+  let usage = """Usage: FSharp.Compiler.ProjectCrackerTool.exe [--text] [--log <log level>] [property value]... <project file>"""
+
   [<EntryPoint>]
   let main argv =
       let mutable text = true
@@ -446,20 +449,23 @@ module internal Program =
           | [] -> ()
           | "--text"::xs -> text <- true; parseArgv xs
           | "--log"::LogLevel v::xs -> logLevel <- Some v; parseArgv xs
+          | "--log"::_::xs -> parseArgv xs
           | [x] -> projectFile <- Some x
           | k::v::xs -> properties <- (k,v) :: properties; parseArgv xs
 
+      parseArgv (Array.toList argv)
+      
       let ret, opts =
           match projectFile with
           | None ->
               1, { ProjectFile = "";
                    Options = [||];
                    ReferencedProjectOptions = [||];
-                   LogOutput = "A project file must be specified." }
+                   LogOutput = usage }
           | Some projectFile ->
               try
                   addMSBuildv14BackupResolution ()
-                  let opts = getOptions argv.[0] properties logLevel
+                  let opts = getOptions projectFile properties logLevel
                   0, opts
               with e ->
                   2, { ProjectFile = projectFile;
