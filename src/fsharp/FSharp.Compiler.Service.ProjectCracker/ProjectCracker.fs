@@ -9,10 +9,9 @@ open System
 
 type ProjectCracker =
 
-    static member GetProjectOptionsFromProjectFileLogged(projectFileName : string, ?properties : (string * string) list, ?loadedTimeStamp, ?enableLogging) =
+    static member GetProjectOptionsFromProjectFileLogged(projectFileName : string, ?properties : (string * string) list, ?loadedTimeStamp, ?loggingLevel) =
         let loadedTimeStamp = defaultArg loadedTimeStamp DateTime.MaxValue // Not 'now', we don't want to force reloading
         let properties = defaultArg properties []
-        let enableLogging = defaultArg enableLogging true
         let logMap = ref Map.empty
 
         let rec convert (opts: Microsoft.FSharp.Compiler.SourceCodeServices.ProjectCrackerTool.ProjectOptions) : FSharpProjectOptions =
@@ -28,10 +27,11 @@ type ProjectCracker =
               UnresolvedReferences = None }
 
         let arguments = new StringBuilder()
-        arguments.Append(projectFileName) |> ignore
-        arguments.Append(' ').Append(enableLogging.ToString()) |> ignore
+        if loggingLevel.IsSome then
+            arguments.Append(" --log ").Append(loggingLevel) |> ignore
         for k, v in properties do
             arguments.Append(' ').Append(k).Append(' ').Append(v) |> ignore
+        arguments.Append(projectFileName) |> ignore
         let codebase = Path.GetDirectoryName(Uri(typeof<ProjectCracker>.Assembly.CodeBase).LocalPath)
         
         let p = new System.Diagnostics.Process()
@@ -52,4 +52,4 @@ type ProjectCracker =
                 projectFileName,
                 ?properties=properties,
                 ?loadedTimeStamp=loadedTimeStamp,
-                enableLogging=false))
+                loggingLevel=None))

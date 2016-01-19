@@ -37,10 +37,8 @@ module internal Program =
   // FSharpProjectFileInfo
   //
   [<Sealed; AutoSerializable(false)>]
-  type FSharpProjectFileInfo (fsprojFileName:string, ?properties, ?enableLogging) =
+  type FSharpProjectFileInfo (fsprojFileName:string, properties, logLevel) =
 
-      let properties = defaultArg properties []
-      let enableLogging = defaultArg enableLogging false
       let mkAbsolute dir v = 
           if Path.IsPathRooted v then v
           else Path.Combine(dir, v)
@@ -48,12 +46,12 @@ module internal Program =
       let mkAbsoluteOpt dir v =  Option.map (mkAbsolute dir) v
 
       let logOpt =
-          if enableLogging then
+          match logLevel with
+          | None -> None
+          | Some level ->
               let log = new BasicStringLogger()
-              do log.Verbosity <- Microsoft.Build.Framework.LoggerVerbosity.Diagnostic
+              do log.Verbosity <- level
               Some log
-          else
-              None
 
       let CrackProjectUsingOldBuildAPI(fsprojFile:string) = 
           let engine = new Microsoft.Build.BuildEngine.Engine()
@@ -370,11 +368,11 @@ module internal Program =
       member x.OutputPath = outputPathOpt
       member x.FullPath = fsprojFullPath
       member x.LogOutput = logOutput
-      static member Parse(fsprojFileName:string, ?properties, ?enableLogging) = new FSharpProjectFileInfo(fsprojFileName, ?properties=properties, ?enableLogging=enableLogging)
+      static member Parse(fsprojFileName:string, properties, logLevel) = new FSharpProjectFileInfo(fsprojFileName, properties, logLevel)
 
-  let getOptions file enableLogging properties =
+  let getOptions file properties logLevel =
     let rec getOptions file : Option<string> * ProjectOptions =
-      let parsedProject = FSharpProjectFileInfo.Parse(file, properties=properties, enableLogging=enableLogging)
+      let parsedProject = FSharpProjectFileInfo.Parse(file, properties, logLevel)
       let referencedProjectOptions =
         [| for file in parsedProject.ProjectReferences do
              if Path.GetExtension(file) = ".fsproj" then
@@ -395,7 +393,7 @@ module internal Program =
                 for file in parsedProject.ProjectReferences do
                     let ext = Path.GetExtension(file)
                     if ext = ".csproj" || ext = ".vbproj" then
-                        let parsedProject = FSharpProjectFileInfo.Parse(file, properties=properties, enableLogging=false)
+                        let parsedProject = FSharpProjectFileInfo.Parse(file, properties, None)
                         match parsedProject.OutputFile with
                         | None -> ()
                         | Some f -> yield "-r:" + f ]
@@ -431,32 +429,43 @@ module internal Program =
     | [] | [_] -> []
     | x::y::rest -> (x,y) :: pairs rest
 
+  let (|LogLevel|_|) str =
+      match LoggerVerbosity.TryParse(str) with
+      | false, _ -> None
+      | true, v -> Some v
+
   [<EntryPoint>]
   let main argv =
-      let text = Array.exists (fun (s: string) -> s = "--text") argv
-      let argv = Array.filter (fun (s: string) -> s <> "--text") argv
+      let mutable text = true
+      let mutable logLevel = None
+      let mutable projectFile = None
+      let mutable properties = []
+      
+      let rec parseArgv list =
+          match list with
+          | [] -> ()
+          | "--text"::xs -> text <- true; parseArgv xs
+          | "--log"::LogLevel v::xs -> logLevel <- Some v; parseArgv xs
+          | [x] -> projectFile <- Some x
+          | k::v::xs -> properties <- (k,v) :: properties; parseArgv xs
 
       let ret, opts =
-          if argv.Length >= 2 then
-              let projectFile = argv.[0]
-              let enableLogging = match Boolean.TryParse(argv.[1]) with
-                                  | true, true -> true
-                                  | _ -> false
+          match projectFile with
+          | None ->
+              1, { ProjectFile = "";
+                   Options = [||];
+                   ReferencedProjectOptions = [||];
+                   LogOutput = "A project file must be specified." }
+          | Some projectFile ->
               try
                   addMSBuildv14BackupResolution ()
-                  let props = pairs (List.ofArray argv.[2..])
-                  let opts = getOptions argv.[0] enableLogging props
+                  let opts = getOptions argv.[0] properties logLevel
                   0, opts
               with e ->
                   2, { ProjectFile = projectFile;
                        Options = [||];
                        ReferencedProjectOptions = [||];
                        LogOutput = e.ToString() }
-          else
-              1, { ProjectFile = "";
-                   Options = [||];
-                   ReferencedProjectOptions = [||];
-                   LogOutput = "At least two arguments required." }
 
       if text then
           printfn "%A" opts
