@@ -409,7 +409,9 @@ module internal Program =
       let options = { ProjectFile = file
                       Options = Array.ofSeq (parsedProject.Options @ referencedProjectOutputs)
                       ReferencedProjectOptions = referencedProjectOptions
-                      LogOutput = parsedProject.LogOutput }
+                      LogOutput = parsedProject.LogOutput
+                      ExceptionRaised = false
+                      ExceptionMessage = "" }
 
       parsedProject.OutputFile, options
 
@@ -448,15 +450,19 @@ module internal Program =
                   let opts = getOptions argv.[0] enableLogging props
                   0, opts
               with e ->
-                  2, { ProjectFile = projectFile;
+                  2, { ProjectFile = "";
                        Options = [||];
                        ReferencedProjectOptions = [||];
-                       LogOutput = e.ToString() }
+                       LogOutput = ""
+                       ExceptionRaised = true
+                       ExceptionMessage = e.Message }
           else
               1, { ProjectFile = "";
                    Options = [||];
                    ReferencedProjectOptions = [||];
-                   LogOutput = "At least two arguments required." }
+                   LogOutput = "At least two arguments required."
+                   ExceptionRaised = false
+                   ExceptionMessage = "" }
 
       if text then
           printfn "%A" opts

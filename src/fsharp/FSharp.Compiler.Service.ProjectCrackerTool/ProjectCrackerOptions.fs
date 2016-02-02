@@ -6,4 +6,6 @@ type ProjectOptions =
     Options: string[]
     ReferencedProjectOptions: (string * ProjectOptions)[]
     LogOutput: string
+    ExceptionRaised: bool
+    ExceptionMessage: string
   }
